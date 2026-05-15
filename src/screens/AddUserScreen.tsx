@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert, Text, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, User } from '../types';
-import { mockUsers } from '../data/mockUsers';
-import { getStoredUsers, saveUser } from '../utils/storage';
+import { getStoredUsers, saveUser } from '../services/userService';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
+import Toast from '../components/Toast';
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'AddUser'>;
 
 const AddUserScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
   
   const [formData, setFormData] = useState({
     fullName: '',
@@ -35,8 +41,7 @@ const AddUserScreen = () => {
     } else {
       // Duplicate email check
       const storedUsers = await getStoredUsers();
-      const allUsers = [...mockUsers, ...storedUsers];
-      if (allUsers.some(u => u.email.toLowerCase() === formData.email.toLowerCase())) {
+      if (storedUsers.some(u => u.email.toLowerCase() === formData.email.toLowerCase())) {
         newErrors.email = 'Email address already exists';
       }
     }
@@ -50,17 +55,32 @@ const AddUserScreen = () => {
 
   const handleSave = async () => {
     if (await validate()) {
-      const newUser: User = {
-        id: Date.now().toString(),
-        ...formData,
-      };
+      setLoading(true);
+      try {
+        const newUser: any = {
+          ...formData,
+        };
 
-      await saveUser(newUser);
-      Alert.alert(
-        "Success",
-        "User added successfully!",
-        [{ text: "OK", onPress: () => navigation.goBack() }]
-      );
+        await saveUser(newUser);
+        setToast({
+          visible: true,
+          message: 'User added successfully! ✨',
+          type: 'success',
+        });
+        
+        // Navigate back after toast starts hiding
+        setTimeout(() => {
+          navigation.goBack();
+        }, 2000);
+      } catch (error) {
+        setToast({
+          visible: true,
+          message: 'Failed to save user. ❌',
+          type: 'error',
+        });
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -73,6 +93,7 @@ const AddUserScreen = () => {
             key={role}
             style={[styles.roleButton, formData.role === role && styles.roleButtonActive]}
             onPress={() => setFormData({ ...formData, role })}
+            disabled={loading}
           >
             <Text style={[styles.roleButtonText, formData.role === role && styles.roleButtonTextActive]}>
               {role}
@@ -84,47 +105,65 @@ const AddUserScreen = () => {
   );
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.form}>
-        <InputField
-          label="Full Name"
-          value={formData.fullName}
-          onChangeText={(text) => setFormData({ ...formData, fullName: text })}
-          error={errors.fullName}
-          placeholder="Enter full name"
-        />
-        <InputField
-          label="Email"
-          value={formData.email}
-          onChangeText={(text) => setFormData({ ...formData, email: text })}
-          error={errors.email}
-          placeholder="Enter email address"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <InputField
-          label="Phone Number"
-          value={formData.phoneNumber}
-          onChangeText={(text) => setFormData({ ...formData, phoneNumber: text })}
-          error={errors.phoneNumber}
-          placeholder="Enter phone number"
-          keyboardType="phone-pad"
-        />
-        
-        <RoleSelector />
+    <View style={styles.container}>
+      <Toast 
+        visible={toast.visible} 
+        message={toast.message} 
+        type={toast.type} 
+        onHide={() => setToast({ ...toast, visible: false })} 
+      />
+      
+      <ScrollView>
+        <View style={styles.form}>
+          <InputField
+            label="Full Name"
+            value={formData.fullName}
+            onChangeText={(text) => setFormData({ ...formData, fullName: text })}
+            error={errors.fullName}
+            placeholder="Enter full name"
+            editable={!loading}
+          />
+          <InputField
+            label="Email"
+            value={formData.email}
+            onChangeText={(text) => setFormData({ ...formData, email: text })}
+            error={errors.email}
+            placeholder="Enter email address"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!loading}
+          />
+          <InputField
+            label="Phone Number"
+            value={formData.phoneNumber}
+            onChangeText={(text) => setFormData({ ...formData, phoneNumber: text })}
+            error={errors.phoneNumber}
+            placeholder="Enter phone number"
+            keyboardType="phone-pad"
+            editable={!loading}
+          />
+          
+          <RoleSelector />
 
-        <InputField
-          label="Address"
-          value={formData.address}
-          onChangeText={(text) => setFormData({ ...formData, address: text })}
-          error={errors.address}
-          placeholder="Enter address"
-          multiline
-        />
+          <InputField
+            label="Address"
+            value={formData.address}
+            onChangeText={(text) => setFormData({ ...formData, address: text })}
+            error={errors.address}
+            placeholder="Enter address"
+            multiline
+            editable={!loading}
+          />
 
-        <Button title="Save User" onPress={handleSave} style={styles.saveButton} />
-      </View>
-    </ScrollView>
+          <Button 
+            title="Save User" 
+            onPress={handleSave} 
+            style={styles.saveButton} 
+            loading={loading}
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 

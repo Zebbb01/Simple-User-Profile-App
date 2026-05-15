@@ -1,10 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, FlatList, StyleSheet, TextInput } from 'react-native';
+import { View, FlatList, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, User } from '../types';
-import { mockUsers } from '../data/mockUsers';
-import { getStoredUsers } from '../utils/storage';
+import { getStoredUsers } from '../services/userService';
 import UserCard from '../components/UserCard';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
@@ -15,11 +14,22 @@ const UserListScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadUsers = useCallback(async () => {
-    const storedUsers = await getStoredUsers();
-    // Combine mock data with stored data
-    setUsers([...mockUsers, ...storedUsers]);
+  const loadUsers = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    
+    try {
+      const storedUsers = await getStoredUsers();
+      setUsers(storedUsers);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -42,18 +52,26 @@ const UserListScreen = () => {
         onChangeText={setSearchQuery}
       />
       
-      <FlatList
-        data={filteredUsers}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <UserCard 
-            user={item} 
-            onPress={() => navigation.navigate('UserDetails', { user: item })} 
-          />
-        )}
-        ListEmptyComponent={<EmptyState message={searchQuery ? "No matching users found." : "No users available."} />}
-        contentContainerStyle={styles.listContent}
-      />
+      {loading && !refreshing ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredUsers}
+          keyExtractor={(item) => item.id}
+          onRefresh={() => loadUsers(true)}
+          refreshing={refreshing}
+          renderItem={({ item }) => (
+            <UserCard 
+              user={item} 
+              onPress={() => navigation.navigate('UserDetails', { user: item })} 
+            />
+          )}
+          ListEmptyComponent={<EmptyState message={searchQuery ? "No matching users found." : "No users available."} />}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
 
       <Button 
         title="Add User" 
@@ -69,6 +87,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
     padding: 16,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchBar: {
     backgroundColor: '#fff',
