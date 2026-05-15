@@ -39,9 +39,3 @@ npx expo start
 
 ---
 
-## Submission Requirements Checklist
-- [ ] **GitHub Repository Link**: [Insert your repository URL here]
-- [ ] **README File**: (This file)
-- [ ] **Setup Instructions**: (Included above)
-- [ ] **Short explanation of the app**: A simple mobile management tool to view and add user profiles with local data persistence.
-- [ ] **Screenshots/Recording**: Please attach a screenshot of the User List and the Add User form to your submission.
